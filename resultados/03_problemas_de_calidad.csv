@@ -1,0 +1,12 @@
+problema,opiniones,% del dataset
+"`genero_lector` con el literal ""-""",125958,32.34
+`vive_en` sin separador ciudad-país,118303,30.37
+`nacimiento` nulo,92192,23.67
+`vive_en` nulo,29881,7.67
+`anio_edicion` posterior a la opinión,28825,7.4
+"edad al opinar fuera de [10, 90]",20038,5.14
+`nacimiento` = 1910 (centinela),17283,4.44
+`nombre` con dígitos (no es un nombre),7330,1.88
+`resumen` nulo,3784,0.97
+"`vive_en` con el literal ""¿?""",3752,0.96
+libro inexistente (título nulo),666,0.17
