@@ -74,6 +74,13 @@ SEED = 42
 # hacen con esta y sólo con esta.
 METRICA = "f1"
 
+# Sobre qué clase se calcula la métrica. Se mide la 0 ("no le gustó"), que es la
+# minoritaria y la informativa. Con la clase 1, predecir siempre "le gustó" da
+# f1 = 0.9123 sin aprender nada, y ningún modelo razonable lo supera: la métrica
+# quedaría dominada por la proporción de clases en vez de medir señal. Sobre la
+# clase 0 ese clasificador trivial da f1 = 0, así que toda mejora es real.
+CLASE_MEDIDA = 0
+
 # Proporción del test en el split. El split es estratificado porque las clases
 # están ~84/16 y un split al azar podría desbalancearlas todavía más.
 TEST_SIZE = 0.25

@@ -18,7 +18,8 @@ from sklearn.model_selection import train_test_split
 from src import config
 
 # Una sola métrica de decisión (CLAUDE.md 3.2). `accuracy` no está y no va a estar:
-# con clases ~84/16, predecir siempre 1 da 84% y no significa nada.
+# con clases ~84/16, predecir siempre 1 da 84% y no significa nada. Por el mismo
+# motivo la métrica se calcula sobre la clase `config.CLASE_MEDIDA`.
 METRICAS = {
     "f1": f1_score,
     "precision": precision_score,
@@ -81,14 +82,14 @@ def evaluar(df: pd.DataFrame, nombre_experimento: str) -> dict:
 
     modelo = modelo_congelado().fit(X_train, y_train)
     metrica = METRICAS[config.METRICA]
-    m_train = metrica(y_train, modelo.predict(X_train))
-    m_test = metrica(y_test, modelo.predict(X_test))
+    m_train = metrica(y_train, modelo.predict(X_train), pos_label=config.CLASE_MEDIDA)
+    m_test = metrica(y_test, modelo.predict(X_test), pos_label=config.CLASE_MEDIDA)
 
     # Las claves son genéricas (`metrica_*`) y no `f1_*`: cuál es la métrica se
     # declara una sola vez, en config.METRICA, y no se repite en cada columna.
     return {
         "cambio": nombre_experimento,
-        "metrica": config.METRICA,
+        "metrica": f"{config.METRICA} (clase {config.CLASE_MEDIDA})",
         "metrica_train": round(m_train, 4),
         "metrica_test": round(m_test, 4),
         "brecha": round(m_test - m_train, 4),
