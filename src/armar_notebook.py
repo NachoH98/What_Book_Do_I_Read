@@ -18,7 +18,10 @@ from src import config
 DESTINO = config.RAIZ / "notebooks" / "TP_individual.ipynb"
 
 # Líneas que sólo tienen sentido en el paquete y estorban en un notebook plano.
-DESCARTAR = ("from __future__ import annotations", "from src", "import argparse")
+# `matplotlib.use("Agg")` es correcto para el script —que sólo escribe PNGs— pero en
+# el notebook fuerza un backend sin pantalla y las figuras no se dibujan.
+DESCARTAR = ("from __future__ import annotations", "from src", "import argparse",
+             'matplotlib.use("Agg")')
 
 # Módulos a volcar, en orden, con el título de su sección. Al agregar un módulo
 # nuevo en las próximas ramas, se suma acá y listo.
@@ -80,6 +83,8 @@ import pandas as pd
 
 pd.set_option("display.width", 200)
 pd.set_option("display.max_columns", 50)
+
+%matplotlib inline
 '''
 
 ALIAS_MD = """En los `.py` el código está repartido en módulos y se referencia como `config.SEED` o
@@ -93,7 +98,7 @@ _yo = sys.modules["__main__"]
 config = carga = diagnostico = eda = limpieza = modelo = experimentos = _yo
 '''
 
-EJECUCION_MD = """## 11. Ejecución
+_EJECUCION_VIEJA = """## 11. Ejecución
 
 Las tres etapas, en orden. Cada `main` lleva el nombre de su módulo porque en un
 notebook todo comparte el mismo espacio de nombres.
@@ -102,11 +107,27 @@ notebook todo comparte el mismo espacio de nombres.
 del #0, así que no hace falta llamar a `main_correr_base` por separado.
 """
 
-EJECUCION_CODE = """%%time
-base = main_diagnostico()      # carga, une, construye el target y deja 01_base.pkl
-main_eda()                     # las figuras del informe
-tabla = main_correr_limpieza() # los experimentos de limpieza y 04_limpio.pkl
-"""
+_EJECUCION_VIEJA_CODE = """(reemplazada por EJECUCIONES)"""
+
+# Cada etapa se corre debajo de su propia sección, no todo junto al final. Con una
+# sola celda de ejecución, las doce secciones quedaban sin una sola salida y el
+# resultado entero caía en un bloque final ilegible.
+EJECUCIONES = {
+    "src/diagnostico.py": (
+        "**Corremos el diagnóstico.** Deja el dataset base en `checkpoints/01_base.pkl`.",
+        "%%time\nbase = main_diagnostico()\n",
+    ),
+    "src/eda.py": (
+        "**Generamos las figuras.** Se muestran acá y además quedan en "
+        "`resultados/figuras/` para el informe.",
+        "%%time\nmain_eda()\n",
+    ),
+    "src/correr_limpieza.py": (
+        "**Corremos los experimentos de limpieza.** Cada paso es una fila con su delta "
+        "marginal; el pipeline final queda en `checkpoints/04_limpio.pkl`.",
+        "%%time\ntabla = main_correr_limpieza()\n",
+    ),
+}
 
 
 def cuerpo_del_modulo(ruta: Path) -> tuple[str, str]:
@@ -165,8 +186,10 @@ def armar() -> dict:
         if i == 0:
             celdas.append(celda("markdown", ALIAS_MD))
             celdas.append(celda("code", ALIAS_CODE))
-
-    celdas += [celda("markdown", EJECUCION_MD), celda("code", EJECUCION_CODE)]
+        if ruta in EJECUCIONES:
+            texto, codigo_ejecucion = EJECUCIONES[ruta]
+            celdas.append(celda("markdown", texto))
+            celdas.append(celda("code", codigo_ejecucion))
 
     return {
         "cells": celdas,

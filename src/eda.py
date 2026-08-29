@@ -84,6 +84,10 @@ def _guardar(fig, nombre: str) -> None:
     config.DIR_FIGURAS.mkdir(parents=True, exist_ok=True)
     destino = config.DIR_FIGURAS / f"{nombre}.png"
     fig.savefig(destino)
+    # `show` antes de `close`: en el notebook dibuja la figura debajo de la celda, y
+    # con el backend Agg del script es un no-op. Sin esto, el Colab no muestra ni un
+    # gráfico: las figuras se irían al disco y el lector no vería nada.
+    plt.show()
     plt.close(fig)
     print(f"  → {destino.name}")
 
