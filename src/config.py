@@ -74,6 +74,29 @@ SEED = 42
 # hacen con esta y sólo con esta.
 METRICA = "f1"
 
+# Proporción del test en el split. El split es estratificado porque las clases
+# están ~84/16 y un split al azar podría desbalancearlas todavía más.
+TEST_SIZE = 0.25
+
+# Hiperparámetros del modelo congelado de evaluación (CLAUDE.md 3.4). No se tocan
+# hasta la rama de optimización: si el modelo cambia entre experimentos, la
+# comparación entre ellos no mide el cambio, mide el modelo.
+MODELO_CONGELADO = {
+    "n_estimators": 300,
+    "max_depth": 8,
+    "class_weight": "balanced",
+    "random_state": SEED,
+    "n_jobs": -1,
+}
+
+# Valor con el que se rellenan los nulos que sobrevivan, sólo para que el modelo
+# pueda correr sobre un dataset sucio. Es un centinela, no una imputación: imputar
+# es una decisión de la rama de limpieza y el instrumento de medición no la toma
+# por su cuenta.
+RELLENO_NULOS = -1
+
+TABLA_EXPERIMENTOS = DIR_RESULTADOS / "tabla_experimentos.csv"
+
 # --------------------------------------------------------------------------------------
 # Definición del target
 # --------------------------------------------------------------------------------------
