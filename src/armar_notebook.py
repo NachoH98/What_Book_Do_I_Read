@@ -18,15 +18,31 @@ from src import config
 DESTINO = config.RAIZ / "notebooks" / "TP_individual.ipynb"
 
 # Líneas que sólo tienen sentido en el paquete y estorban en un notebook plano.
-DESCARTAR = ("from __future__ import annotations", "from src import ", "import argparse")
+DESCARTAR = ("from __future__ import annotations", "from src", "import argparse")
 
 # Módulos a volcar, en orden, con el título de su sección. Al agregar un módulo
 # nuevo en las próximas ramas, se suma acá y listo.
+# El orden importa: un módulo tiene que estar antes que otro si el otro lo usa al
+# definirse, no sólo al ejecutarse. `carga.unir` evalúa config.HOW_UNION en el valor
+# por defecto de un parámetro, y `correr_limpieza.PASOS` referencia funciones de
+# `limpieza` a nivel de módulo.
 SECCIONES = [
     ("src/config.py", "1. Configuración"),
     ("src/carga.py", "2. Carga y unión de las tres tablas"),
     ("src/diagnostico.py", "3. Diagnóstico de la unión"),
+    ("src/eda.py", "4. Análisis exploratorio"),
+    ("src/genero_por_nombre.py", "5. Diccionario de género por nombre"),
+    ("src/limpieza.py", "6. Limpieza"),
+    ("src/modelo.py", "7. Modelo congelado de evaluación"),
+    ("src/experimentos.py", "8. Registro de experimentos"),
+    ("src/correr_base.py", "9. Experimento #0 — la base sin limpiar"),
+    ("src/correr_limpieza.py", "10. Los experimentos de limpieza"),
 ]
+
+# Cuatro módulos definen `main()`. En el paquete conviven sin problema porque cada uno
+# tiene su espacio de nombres; en un notebook plano el último pisaría a los anteriores
+# y quedaría una sola función `main`. El generador les pone el nombre del módulo.
+NOMBRE_MAIN = "def main("
 
 PORTADA = """# TP Individual — QuéLibroLeo
 ### E72.1.01 · Fundamentos de Métodos Analíticos Predictivos
@@ -73,16 +89,23 @@ hacen que esas referencias sigan funcionando sin tener que reescribir una sola l
 
 ALIAS_CODE = '''import sys
 
-config = carga = sys.modules["__main__"]
+_yo = sys.modules["__main__"]
+config = carga = diagnostico = eda = limpieza = modelo = experimentos = _yo
 '''
 
-EJECUCION_MD = """## 4. Ejecución
+EJECUCION_MD = """## 11. Ejecución
 
-Corre el diagnóstico completo y deja el dataset base en `checkpoints/01_base.pkl`.
+Las tres etapas, en orden. Cada `main` lleva el nombre de su módulo porque en un
+notebook todo comparte el mismo espacio de nombres.
+
+`main_correr_limpieza` reconstruye la tabla de experimentos entera, incluida la fila
+del #0, así que no hace falta llamar a `main_correr_base` por separado.
 """
 
 EJECUCION_CODE = """%%time
-base = main()
+base = main_diagnostico()      # carga, une, construye el target y deja 01_base.pkl
+main_eda()                     # las figuras del informe
+tabla = main_correr_limpieza() # los experimentos de limpieza y 04_limpio.pkl
 """
 
 
@@ -108,7 +131,16 @@ def cuerpo_del_modulo(ruta: Path) -> tuple[str, str]:
 
     codigo = [ln for ln in lineas[desde:corte]
               if not any(ln.startswith(p) for p in DESCARTAR)]
-    return docstring, "\n".join(codigo).strip() + "\n"
+    fuente_limpia = "\n".join(codigo).strip() + "\n"
+
+    # `main` se renombra con el nombre del módulo. Es seguro: cada módulo la define
+    # una sola vez y la llama únicamente desde el guard `__main__`, que ya se descartó.
+    nombre_main = None
+    if NOMBRE_MAIN in fuente_limpia:
+        nombre_main = f"main_{ruta.stem}"
+        fuente_limpia = fuente_limpia.replace(NOMBRE_MAIN, f"def {nombre_main}(")
+
+    return docstring, fuente_limpia, nombre_main
 
 
 def celda(tipo: str, texto: str) -> dict:
@@ -125,7 +157,7 @@ def armar() -> dict:
     ]
 
     for i, (ruta, titulo) in enumerate(SECCIONES):
-        docstring, codigo = cuerpo_del_modulo(config.RAIZ / ruta)
+        docstring, codigo, _ = cuerpo_del_modulo(config.RAIZ / ruta)
         celdas.append(celda("markdown", f"## {titulo}\n\n{docstring}\n\n*(desde `{ruta}`)*\n"))
         celdas.append(celda("code", codigo))
         # Los alias van después de config y antes del resto, porque `unir` los usa

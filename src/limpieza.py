@@ -185,8 +185,16 @@ def normalizar_vive_en(df: pd.DataFrame) -> pd.DataFrame:
     ciudad = partido.str[0]
     pais = partido.str[1]
 
+    # PROBADO Y DESCARTADO: rescatar las 2.812 opiniones que traen "Ciudad -" con el
+    # país vacío ("Madrid -", "Zaragoza -"), mirando qué ciudades aparecen con España
+    # en el resto del dataset. Corrige ~350 filas españolas que hoy caen en "Otros",
+    # pero rompe 3.938: alcanza con que exista una sola fila "Mexico - España" para
+    # que las 3.673 opiniones que dicen "Mexico" pasen a ser España, y lo mismo con
+    # Ecuador (265), "Berlín -" (66) y "London -" (1). El remedio es diez veces peor
+    # que la enfermedad, así que las huérfanas quedan en "Otros".
+
     region = pd.Series(DESCONOCIDO, index=out.index, dtype=object)
-    es_espania = pais.eq("españa") | pais.eq("espana") | pais.eq("spain")
+    es_espania = pais.isin(("españa", "espana", "spain"))
 
     region[es_espania] = "España (sin especificar)"
     region[es_espania & ciudad.notna()] = "España castellanohablante"
@@ -254,6 +262,13 @@ def imputar_categoricas(df: pd.DataFrame) -> pd.DataFrame:
 # (19.551) y `editorial` (2.676) necesitan un top-N, y CLAUDE.md 3.3 exige que ese
 # top-N se defina con value_counts() sobre train: va en la rama del split, no acá.
 COLS_DUMMIES = [COL_PAIS, COL_GENERO, "genero_libro"]
+
+# La guarda de idempotencia de `crear_dummies` compara por prefijo, así que si el
+# nombre de una columna fuera prefijo de otra ("genero_lector" y
+# "genero_lector_imputado"), la segunda nunca recibiría sus dummies. Hoy no pasa;
+# esto lo deja explícito para que no pase en silencio si se agrega una columna.
+assert not any(a != b and a.startswith(f"{b}_") for a in COLS_DUMMIES for b in COLS_DUMMIES), \
+    "Un nombre de COLS_DUMMIES es prefijo de otro: la guarda por prefijo fallaría."
 
 
 def crear_dummies(df: pd.DataFrame) -> pd.DataFrame:
