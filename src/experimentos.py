@@ -12,9 +12,22 @@ import pandas as pd
 from src import config
 
 COLUMNAS = ["#", "cambio", "metrica_train", "metrica_test", "brecha",
-            "delta", "filas", "columnas", "segundos", "queda"]
+            "delta", "delta_marginal", "filas", "columnas", "segundos", "queda"]
 
 BASE = "#0"  # etiqueta de la fila base en la columna `queda`
+# Las filas de resumen empiezan con "=". No son un paso más: comparar su delta
+# marginal contra la fila de arriba no significa nada, porque la de arriba puede ser
+# una variante descartada y no el paso anterior del pipeline.
+PREFIJO_RESUMEN = "="
+
+
+def _veredicto(delta_marginal) -> str:
+    """sí / no / ruido, según el delta marginal contra la banda medida del instrumento."""
+    if pd.isna(delta_marginal):
+        return ""
+    if abs(delta_marginal) < config.UMBRAL_RUIDO:
+        return "ruido"
+    return "sí" if delta_marginal > 0 else "no"
 
 
 def tabla() -> pd.DataFrame:
@@ -31,9 +44,17 @@ def registrar(resultado: dict) -> pd.DataFrame:
     lugar de duplicarla: volver a correr un experimento es normal, tener dos filas
     con el mismo nombre y números distintos no.
 
-    `delta` es la diferencia contra el experimento #0 y `queda` es la sugerencia
-    que se desprende de ella: si el cambio no mejora la métrica, no queda. La
-    decisión final es del informe, no de esta función.
+    Hay dos deltas y miden cosas distintas:
+
+    - `delta` compara contra el #0 y responde "¿el pipeline hasta acá es mejor que la
+      base?". Es acumulado.
+    - `delta_marginal` compara contra el paso anterior y responde "¿este cambio, solo,
+      aportó algo?". Es el que corresponde a ceteris paribus (CLAUDE.md 3.4), y el
+      que decide `queda`.
+
+    `queda` marca "ruido" cuando el delta marginal cae dentro de la banda medida del
+    instrumento (config.UMBRAL_RUIDO): ahí no se puede afirmar ni que sirve ni que no.
+    La decisión final es del informe, no de esta función.
     """
     previa = tabla()
     ya_estaba = previa["cambio"] == resultado["cambio"]
@@ -47,6 +68,7 @@ def registrar(resultado: dict) -> pd.DataFrame:
         "metrica_test": resultado["metrica_test"],
         "brecha": resultado["brecha"],
         "delta": None,
+        "delta_marginal": None,
         "filas": resultado["filas"],
         "columnas": resultado["columnas"],
         "segundos": resultado["segundos"],
@@ -62,8 +84,11 @@ def registrar(resultado: dict) -> pd.DataFrame:
     if not base.empty:
         referencia = float(base.iloc[0])
         nueva["delta"] = (nueva["metrica_test"] - referencia).round(4)
-        nueva["queda"] = nueva["delta"].apply(lambda d: "sí" if d > 0 else "no")
-        nueva.loc[nueva["#"] == 0, "queda"] = BASE
+        nueva["delta_marginal"] = nueva["metrica_test"].diff().round(4)
+        nueva["queda"] = nueva["delta_marginal"].apply(_veredicto)
+        nueva.loc[nueva["#"] == 0, ["delta_marginal", "queda"]] = [None, BASE]
+        resumen = nueva["cambio"].str.startswith(PREFIJO_RESUMEN)
+        nueva.loc[resumen, ["delta_marginal", "queda"]] = [None, "final"]
 
     config.DIR_RESULTADOS.mkdir(parents=True, exist_ok=True)
     nueva[COLUMNAS].to_csv(config.TABLA_EXPERIMENTOS, index=False)

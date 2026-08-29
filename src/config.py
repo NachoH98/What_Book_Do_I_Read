@@ -62,6 +62,7 @@ CSV_LECTORES = resolver_csv(ARCHIVO_LECTORES)
 CSV_OPINIONES = resolver_csv(ARCHIVO_OPINIONES)
 
 CHECKPOINT_BASE = DIR_CHECKPOINTS / "01_base.pkl"
+CHECKPOINT_LIMPIO = DIR_CHECKPOINTS / "04_limpio.pkl"
 
 # --------------------------------------------------------------------------------------
 # Reproducibilidad y evaluación
@@ -103,6 +104,11 @@ MODELO_CONGELADO = {
 RELLENO_NULOS = -1
 
 TABLA_EXPERIMENTOS = DIR_RESULTADOS / "tabla_experimentos.csv"
+
+# Banda de ruido del instrumento, medida: el mismo dataset evaluado con 6 semillas de
+# split distintas da σ = 0.0024, así que 2σ ≈ 0.005. Un delta más chico que esto no se
+# distingue del azar del split y no alcanza para declarar que un cambio sirve.
+UMBRAL_RUIDO = 0.005
 
 # --------------------------------------------------------------------------------------
 # Definición del target
