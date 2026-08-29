@@ -11,7 +11,23 @@ from pathlib import Path
 # Rutas
 # --------------------------------------------------------------------------------------
 
-RAIZ = Path(__file__).resolve().parent.parent
+def _raiz() -> Path:
+    """Raíz del proyecto, tanto corriendo como módulo como dentro del notebook.
+
+    En el notebook no existe `__file__` y el directorio de trabajo puede ser
+    `notebooks/`, así que se sube hasta encontrar el CLAUDE.md. En Colab, donde no
+    está, cae en el directorio de trabajo y todo cuelga de ahí.
+    """
+    if "__file__" in globals():
+        return Path(__file__).resolve().parent.parent
+    actual = Path.cwd().resolve()
+    for candidata in (actual, *actual.parents):
+        if (candidata / "CLAUDE.md").is_file():
+            return candidata
+    return actual
+
+
+RAIZ = _raiz()
 
 # Los CSV no están versionados. Por defecto se buscan en data/; se puede apuntar a
 # otro lado con la variable de entorno QLL_DATA_DIR (útil en Colab, donde los datos
