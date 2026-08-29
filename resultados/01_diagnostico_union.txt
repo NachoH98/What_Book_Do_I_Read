@@ -1,0 +1,141 @@
+
+========================================================================================
+0. LECTURA DE LAS TRES TABLAS
+========================================================================================
+libros:    /home/user/What_Book_Do_I_Read/libros.csv
+lectores:  /home/user/What_Book_Do_I_Read/lectores.csv
+opiniones: /home/user/What_Book_Do_I_Read/interacciones.csv
+
+========================================================================================
+1. PERFIL DE CADA TABLA POR SEPARADO
+========================================================================================
+
+### Tabla `libros` — 128,743 filas × 9 columnas
+             tipo  % nulos  valores únicos
+id_libro      str     0.00          128743
+titulo        str    60.76           48356
+autor         str    60.76           21654
+genero        str    60.76              65
+editorial     str    60.76            2908
+anio_edicion  str    60.76             118
+isbn          str    60.76           49930
+resumen       str    62.10           47991
+img_src       str    60.76           47861
+  IDs únicos en `id_libro`: 128,743
+  Filas duplicadas por la clave ['id_libro']: 0
+
+### Tabla `lectores` — 11,285 filas × 5 columnas
+               tipo  % nulos  valores únicos
+id_lector       str     0.00           11285
+nombre          str     0.00            8830
+genero          str     0.00               3
+vive_en         str     4.73            1584
+nacimiento  float64    30.39              94
+  IDs únicos en `id_lector`: 11,285
+  Filas duplicadas por la clave ['id_lector']: 0
+
+### Tabla `opiniones` — 479,827 filas × 4 columnas
+            tipo  % nulos  valores únicos
+id_lector    str      0.0           10689
+id_libro     str      0.0           50787
+fecha        str      0.0            6619
+rating     int64      0.0              10
+  IDs únicos en `id_lector`: 10,689
+  IDs únicos en `id_libro`: 50,787
+  Filas duplicadas por la clave ['id_lector', 'id_libro']: 0
+
+========================================================================================
+2. COBERTURA: CUÁNTO DE CADA TABLA USA EL DATASET
+========================================================================================
+          en la tabla  con al menos una opinión  % usado  sin ninguna opinión  % descartado por el merge
+tabla                                                                                                   
+libros         128743                     50451    39.19                78292                      60.81
+lectores        11285                     10683    94.67                  602                       5.33
+
+Opiniones huérfanas (referencian un ID que no existe):
+                                                opiniones  % del total
+caso                                                                  
+libro inexistente                                     815        0.170
+lector inexistente                                    142        0.030
+libro Y lector inexistentes                             0        0.000
+al menos una de las dos (se pierden con inner)        957        0.199
+
+========================================================================================
+3. NULOS ANTES Y DESPUÉS DEL MERGE
+========================================================================================
+                         % nulos ANTES (tabla completa)  % nulos (sólo con opiniones)  % nulos DESPUÉS (left)  % nulos DESPUÉS (inner)  reducción (pp)
+tabla     columna                                                                                                                                     
+opiniones id_lector                                0.00                          0.00                    0.00                     0.00            0.00
+          id_libro                                 0.00                          0.00                    0.00                     0.00            0.00
+          fecha                                    0.00                          0.00                    0.00                     0.00            0.00
+          rating                                   0.00                          0.00                    0.00                     0.00            0.00
+libros    titulo                                  60.76                          0.01                    0.17                     0.00           60.59
+          autor                                   60.76                          0.02                    0.17                     0.00           60.59
+          genero_libro                            60.76                          0.01                    0.17                     0.00           60.59
+          editorial                               60.76                          0.02                    0.18                     0.01           60.59
+          anio_edicion                            60.76                          0.01                    0.17                     0.00           60.59
+          isbn                                    60.76                          0.01                    0.17                     0.00           60.59
+          resumen                                 62.10                          3.42                    0.99                     0.82           61.11
+          img_src                                 60.76                          0.01                    0.17                     0.00           60.59
+lectores  nombre                                   0.00                          0.00                    0.03                     0.00           -0.03
+          genero_lector                            0.00                          0.00                    0.03                     0.00           -0.03
+          vive_en                                  4.73                          4.93                    7.52                     7.48           -2.79
+          nacimiento                              30.39                         29.18                   24.91                    24.89            5.47
+
+========================================================================================
+4. EL 60% DE NULOS DE `libros` NO ES UN PROBLEMA A LIMPIAR
+========================================================================================
+Celdas nulas en las columnas de `libros` (tabla completa): 627,514 de 1,029,944  (60.93 %)
+Libros sin ningún atributo cargado (fila entera vacía): 78,222 de 128,743  (60.76 %)
+Nulos en columnas de libros dentro del dataset unido (left): 10,526 de 3,838,616  (0.27 %)
+Nulos en columnas de libros dentro del dataset unido (inner): 4,005 de 3,830,960  (0.10 %)
+
+========================================================================================
+5. left vs inner
+========================================================================================
+       filas tras el merge  filas tras quitar rating 6  % de opiniones conservadas  % nulos promedio (cols. libros)  % nulos promedio (cols. lectores)  % clase 1 (gustó)
+how                                                                                                                                                                      
+left                479827                      389508                     100.000                             0.27                               8.12              83.88
+inner               478870                      388720                      99.801                             0.10                               8.09              83.89
+
+¿Las opiniones huérfanas tienen otro comportamiento de target?
+                     filas  % gustó
+grupo                              
+con libro y lector  388716    83.89
+huérfanas              792    75.00
+
+========================================================================================
+6. DISTRIBUCIÓN DE CLASES (dataset construido con how='left')
+========================================================================================
+Ratings en la tabla de opiniones (antes de construir el target):
+        opiniones  % del total         clase
+rating                                      
+1            6461         1.35  0 (no gustó)
+2            5385         1.12  0 (no gustó)
+3            4899         1.02  0 (no gustó)
+4           19440         4.05  0 (no gustó)
+5           26623         5.55  0 (no gustó)
+6           90319        18.82    DESCARTADO
+7           89222        18.59     1 (gustó)
+8          126427        26.35     1 (gustó)
+9           55852        11.64     1 (gustó)
+10          55199        11.50     1 (gustó)
+
+Filas eliminadas por rating == 6: 90,319 (18.82 % de las opiniones)
+
+Distribución final de `gusto` (389,508 filas):
+        filas      %
+gusto               
+0       62808  16.12
+1      326700  83.88
+
+Ratio de desbalanceo: 5.20 a 1 — desbalanceo clásico, no extremo.
+
+========================================================================================
+7. SALIDAS
+========================================================================================
+Guardado: /home/user/What_Book_Do_I_Read/resultados/01_nulos_antes_despues.csv
+Guardado: /home/user/What_Book_Do_I_Read/resultados/01_comparacion_left_inner.csv
+Guardado: /home/user/What_Book_Do_I_Read/checkpoints/01_base.pkl
+Dimensiones: 389,508 filas × 17 columnas  (how='left', 73.5 MB)
+Columnas: ['id_lector', 'id_libro', 'fecha', 'rating', 'titulo', 'autor', 'genero_libro', 'editorial', 'anio_edicion', 'isbn', 'resumen', 'img_src', 'nombre', 'genero_lector', 'vive_en', 'nacimiento', 'gusto']

@@ -1,0 +1,22 @@
+# Datos y artefactos pesados: no van al repositorio (ver CLAUDE.md, sección 6)
+data/
+checkpoints/
+*.pkl
+
+# Entornos
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Sistema / editores
+.DS_Store
+.vscode/
+.idea/

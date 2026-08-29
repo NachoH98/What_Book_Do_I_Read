@@ -1,0 +1,17 @@
+tabla,columna,% nulos ANTES (tabla completa),% nulos (sólo con opiniones),% nulos DESPUÉS (left),% nulos DESPUÉS (inner),reducción (pp)
+opiniones,id_lector,0.0,0.0,0.0,0.0,0.0
+opiniones,id_libro,0.0,0.0,0.0,0.0,0.0
+opiniones,fecha,0.0,0.0,0.0,0.0,0.0
+opiniones,rating,0.0,0.0,0.0,0.0,0.0
+libros,titulo,60.76,0.01,0.17,0.0,60.59
+libros,autor,60.76,0.02,0.17,0.0,60.59
+libros,genero_libro,60.76,0.01,0.17,0.0,60.59
+libros,editorial,60.76,0.02,0.18,0.01,60.59
+libros,anio_edicion,60.76,0.01,0.17,0.0,60.59
+libros,isbn,60.76,0.01,0.17,0.0,60.59
+libros,resumen,62.1,3.42,0.99,0.82,61.11
+libros,img_src,60.76,0.01,0.17,0.0,60.59
+lectores,nombre,0.0,0.0,0.03,0.0,-0.03
+lectores,genero_lector,0.0,0.0,0.03,0.0,-0.03
+lectores,vive_en,4.73,4.93,7.52,7.48,-2.79
+lectores,nacimiento,30.39,29.18,24.91,24.89,5.47

@@ -1,0 +1,81 @@
+"""Configuración global del TP: rutas, semilla, métrica de decisión y cortes de rating.
+
+Todo lo que otro módulo necesite parametrizar vive acá. Nadie más hardcodea rutas
+ni números mágicos.
+"""
+
+import os
+from pathlib import Path
+
+# --------------------------------------------------------------------------------------
+# Rutas
+# --------------------------------------------------------------------------------------
+
+RAIZ = Path(__file__).resolve().parent.parent
+
+# Los CSV no están versionados. Por defecto se buscan en data/; se puede apuntar a
+# otro lado con la variable de entorno QLL_DATA_DIR (útil en Colab, donde los datos
+# quedan montados en Drive).
+DIR_DATOS = Path(os.environ.get("QLL_DATA_DIR", RAIZ / "data"))
+DIR_CHECKPOINTS = Path(os.environ.get("QLL_CHECKPOINTS_DIR", RAIZ / "checkpoints"))
+DIR_RESULTADOS = RAIZ / "resultados"
+DIR_FIGURAS = DIR_RESULTADOS / "figuras"
+
+# Nombres de archivo tal como los entregó la cátedra. La tabla de opiniones viene
+# con el nombre "interacciones.csv".
+ARCHIVO_LIBROS = os.environ.get("QLL_CSV_LIBROS", "libros.csv")
+ARCHIVO_LECTORES = os.environ.get("QLL_CSV_LECTORES", "lectores.csv")
+ARCHIVO_OPINIONES = os.environ.get("QLL_CSV_OPINIONES", "interacciones.csv")
+
+
+def resolver_csv(nombre: str) -> Path:
+    """Devuelve la ruta del CSV: primero en DIR_DATOS, si no está, en la raíz del repo.
+
+    El fallback a la raíz existe porque los CSV de la cátedra hoy están ahí; la ruta
+    canónica sigue siendo data/. Si no aparece en ninguna de las dos, devuelve la
+    canónica para que el error de lectura indique dónde había que ponerlo.
+    """
+    for candidata in (DIR_DATOS / nombre, RAIZ / nombre):
+        if candidata.is_file():
+            return candidata
+    return DIR_DATOS / nombre
+
+
+CSV_LIBROS = resolver_csv(ARCHIVO_LIBROS)
+CSV_LECTORES = resolver_csv(ARCHIVO_LECTORES)
+CSV_OPINIONES = resolver_csv(ARCHIVO_OPINIONES)
+
+CHECKPOINT_BASE = DIR_CHECKPOINTS / "01_base.pkl"
+
+# --------------------------------------------------------------------------------------
+# Reproducibilidad y evaluación
+# --------------------------------------------------------------------------------------
+
+SEED = 42
+
+# Métrica única de decisión (CLAUDE.md 3.2). El dataset está desbalanceado ~80/20,
+# así que accuracy está prohibida. Todas las comparaciones entre experimentos se
+# hacen con esta y sólo con esta.
+METRICA = "f1"
+
+# --------------------------------------------------------------------------------------
+# Definición del target
+# --------------------------------------------------------------------------------------
+
+COL_RATING = "rating"
+TARGET = "gusto"
+
+RATING_MIN_GUSTO = 7      # rating >= 7  -> gusto = 1
+RATING_MAX_NO_GUSTO = 5   # rating <= 5  -> gusto = 0
+RATING_DESCARTADO = 6     # rating == 6  -> la fila se elimina (rating gris)
+
+# --------------------------------------------------------------------------------------
+# Unión de tablas
+# --------------------------------------------------------------------------------------
+
+COL_ID_LIBRO = "id_libro"
+COL_ID_LECTOR = "id_lector"
+
+# Cómo se resuelven las opiniones que apuntan a un libro o a un lector inexistente.
+# Se decide con el diagnóstico de src/diagnostico.py.
+HOW_UNION = "left"
