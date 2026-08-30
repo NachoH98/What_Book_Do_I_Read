@@ -1,0 +1,7 @@
+Modelo,Hiperparámetros,Métrica en prueba,Diferencia,Brecha,CV media,CV desvío,Tiempo (s),Elegido
+RandomForest (bagging de árboles),"{'n_estimators': 500, 'min_samples_leaf': 5, 'max_features': 0.3, 'max_depth': 16}",0.5185,0.0,-0.2071,0.5446,0.0125,71.2,
+GradientBoosting (boosting),"{'subsample': 1.0, 'n_estimators': 200, 'max_depth': 8, 'learning_rate': 0.2}",0.3899,-0.1286,-0.5326,0.646,0.0184,306.0,
+Bagging de regresión logística (lineal),"{'modelo__n_estimators': 25, 'modelo__max_samples': 0.5}",0.4948,-0.0237,-0.0124,0.4973,0.0115,50.2,✓
+KNN (distancias),"{'modelo__weights': 'distance', 'modelo__n_neighbors': 15}",0.231,-0.2875,-0.769,0.1819,0.019,79.2,
+Voting (RF + GB + KNN),combinación de los base optimizados,0.4284,-0.0901,-0.5639,0.5763,0.0124,405.7,
+Stacking (RF + GB + KNN → logística),combinación de los base optimizados,0.482,-0.0365,-0.3803,0.5986,0.0119,749.1,

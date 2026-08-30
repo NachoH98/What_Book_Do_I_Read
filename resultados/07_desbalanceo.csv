@@ -1,5 +1,5 @@
 Modelo,Hiperparámetros,Métrica en prueba,Métrica en train,Brecha,Tiempo (s)
-class_weight='balanced' (sin tocar los datos),,0.4886,0.5009,-0.0123,29.7
-RandomUnderSampler,,0.4884,0.4995,-0.0111,10.9
-SMOTE,,0.4948,0.5059,-0.0111,62.7
-ADASYN,,0.4892,0.5013,-0.0122,117.4
+class_weight='balanced' (sin tocar los datos),,0.4876,0.506,-0.0184,9.0
+RandomUnderSampler,,0.4897,0.5074,-0.0177,4.4
+SMOTE,,0.493,0.5135,-0.0205,21.5
+ADASYN,,0.4899,0.5103,-0.0205,27.1

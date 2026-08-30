@@ -30,7 +30,7 @@ from sklearn.preprocessing import MinMaxScaler
 from src import config, modelo, variables
 
 MUESTRA_BUSQUEDA = 60_000   # para RandomizedSearch
-MUESTRA_CV = 40_000         # para la validación cruzada en 10 partes
+MUESTRA_CV = 25_000         # para la validación cruzada en 10 partes
 FOLDS = 10
 
 # Muestra para el ENTRENAMIENTO FINAL de cada modelo. La evaluación sigue siendo contra
@@ -203,8 +203,15 @@ def boxplot_de_folds(resultados_cv: dict, nombre="13_boxplot_folds"):
     plt = _estilo()
     nombres = list(resultados_cv)
     fig, ax = plt.subplots(figsize=(9, 4.2))
-    caja = ax.boxplot([resultados_cv[n] for n in nombres], vert=False, patch_artist=True,
-                      labels=[n[:38] for n in nombres], widths=0.55)
+    # matplotlib 3.9 renombró `labels` a `tick_labels` en boxplot y 3.11 lo eliminó.
+    # Se pasa por nombre nuevo si existe, para no depender de la versión instalada.
+    etiquetas = [n[:38] for n in nombres]
+    try:
+        caja = ax.boxplot([resultados_cv[n] for n in nombres], vert=False,
+                          patch_artist=True, tick_labels=etiquetas, widths=0.55)
+    except TypeError:
+        caja = ax.boxplot([resultados_cv[n] for n in nombres], vert=False,
+                          patch_artist=True, labels=etiquetas, widths=0.55)
     for parche in caja["boxes"]:
         parche.set_facecolor("#2a78d6"); parche.set_alpha(0.75); parche.set_edgecolor("#2a78d6")
     for mediana in caja["medians"]:
@@ -358,6 +365,14 @@ def main() -> pd.DataFrame:
     print(tabla_b[columnas].to_string(index=False))
 
     # ---------- Cierre ----------
+    # El estado se guarda ANTES de dibujar: una corrida de 50 minutos no puede
+    # perderse porque falle una llamada a matplotlib.
+    import pickle
+    with open(config.DIR_CHECKPOINTS / "07_corrida_modelos.pkl", "wb") as archivo:
+        pickle.dump({"tabla": tabla_b, "cv": resultados_cv, "ganador": ganador,
+                     "modelos": optimizados}, archivo)
+    print(f"\nEstado guardado: {config.DIR_CHECKPOINTS / '07_corrida_modelos.pkl'}")
+
     print("\nFiguras:")
     boxplot_de_folds(resultados_cv)
     elegido = optimizados[ganador]
@@ -369,7 +384,6 @@ def main() -> pd.DataFrame:
     grafico_importancias(elegido, X.columns)
     matriz_de_confusion(y[~es_train], predicho)
 
-    import pickle
     with open(config.DIR_CHECKPOINTS / "07_modelo_final.pkl", "wb") as archivo:
         pickle.dump({"nombre": ganador, "estimador": elegido,
                      "columnas": list(X.columns)}, archivo)
