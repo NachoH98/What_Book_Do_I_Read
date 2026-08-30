@@ -12,6 +12,7 @@ Lematizar 389.508 veces lo mismo sería ocho veces más trabajo para el mismo re
 from __future__ import annotations
 
 import re
+import unicodedata
 
 import pandas as pd
 import spacy
@@ -28,8 +29,10 @@ MODELO_SPACY = "es_core_news_sm"
 # opinión, así que el riesgo es menor que en un texto de reseña. Se respeta igual.
 NEGACIONES = {
     "no", "ni", "nunca", "jamas", "jamás", "tampoco", "nada", "nadie",
-    "ningun", "ningún", "ninguna", "ninguno", "sin", "contra", "apenas", "pero",
+    "ningun", "ningún", "ninguna", "ninguno", "sin", "contra", "apenas",
 }
+# "pero" salió de la lista: es un marcador de contraste, no una negación, y en un
+# corpus de sinopsis aparecía entre las tres palabras más frecuentes sin aportar nada.
 
 # Ruido específico de esta fuente, detectado mirando los resúmenes.
 RUIDO = re.compile(r"https?://\S+|www\.\S+|\b\d{9,}\b|[^\wáéíóúüñ\s]", re.IGNORECASE)
@@ -53,6 +56,11 @@ def _normalizar(texto: str) -> str:
     """Minúsculas, sin URLs ni puntuación, sin repeticiones de letras."""
     if not isinstance(texto, str):
         return ""
+    # NFC primero: parte del corpus trae los acentos descompuestos ("ñ" como "n" más
+    # una tilde combinante). Python cuenta esa tilde como carácter de palabra, así que
+    # sin componerla aparece como un token "~" suelto —y era una de las palabras más
+    # grandes de la nube— y parte "país" en "paí" + "s".
+    texto = unicodedata.normalize("NFC", texto)
     texto = texto.lower()
     texto = REPETICIONES.sub(r"\1", texto)
     texto = RUIDO.sub(" ", texto)
@@ -63,16 +71,28 @@ def limpiar(textos: list[str], nlp=None, lote: int = 200) -> list[str]:
     """Normaliza, tokeniza, saca stopwords y lematiza. Devuelve texto listo para vectorizar."""
     nlp = nlp or cargar_modelo()
     stopwords = construir_stopwords(nlp)
+    # Los lemas de los pronombres y determinantes que la lista por defecto no cubre.
+    # Lemas que la lista por defecto no cubre: pronombres que salen de partir lemas
+    # compuestos, y verbos vacíos que aparecen en todos los resúmenes sin distinguir.
+    stopwords_amplias = {"él", "ella", "ello", "uno", "algo", "cual", "tan", "ser",
+                         "haber", "estar", "tener", "hacer", "poder", "deber"} - NEGACIONES
     normalizados = [_normalizar(t) for t in textos]
 
     limpios = []
     for doc in nlp.pipe(normalizados, batch_size=lote):
+        # spaCy devuelve lemas de VARIAS palabras para los verbos con pronombre
+        # enclítico: "dudarlo" -> "dudar él", "llevarse" -> "llevar él". Si el lema
+        # se usa entero, ese "él" entra al corpus como token suelto y termina siendo
+        # la palabra más frecuente de todas. Hay que partir el lema y filtrar cada
+        # parte por separado.
         lemas = [
-            token.lemma_ for token in doc
-            if token.lemma_ not in stopwords
-            and len(token.lemma_) >= LARGO_MINIMO
-            and not token.is_punct
-            and not token.like_num
+            parte
+            for token in doc
+            if not token.is_punct and not token.like_num
+            for parte in token.lemma_.split()
+            if parte not in stopwords
+            and parte not in stopwords_amplias
+            and len(parte) >= LARGO_MINIMO
         ]
         limpios.append(" ".join(lemas))
     return limpios

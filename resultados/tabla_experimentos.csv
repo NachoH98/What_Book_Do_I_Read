@@ -18,3 +18,9 @@
 16,~ sólo interacción región × editorial,0.3347,0.3257,-0.009,0.0374,,389508,341,28.7,final
 17,~ variables con cálculo directo (descartado),0.7211,0.4865,-0.2346,0.1982,,389508,353,31.8,final
 18,= TODAS las variables (leave-one-out),0.5004,0.489,-0.0114,0.2007,,389508,353,32.5,final
+19,~ TF-IDF min_df=5 max_df=0.5 (2000 palabras),0.4997,0.4885,-0.0111,0.2002,,389508,413,36.0,final
+20,~ TF-IDF min_df=20 max_df=0.3 (2000 palabras),0.5009,0.4886,-0.0123,0.2003,,389508,413,35.6,final
+21,~ TF-IDF min_df=50 max_df=0.2 (1000 palabras),0.4992,0.4871,-0.0121,0.1988,,389508,413,35.7,final
+22,~ palabras clave binarias (35),0.5003,0.4877,-0.0126,0.1994,,389508,388,35.8,final
+23,= CON TEXTO (mejor configuración),0.5009,0.4886,-0.0123,0.2003,,389508,413,37.3,final
+24,~ TF-IDF sobre el dataset limpio (sin perfiles),0.3167,0.3102,-0.0065,0.0219,,389508,124,18.7,final

@@ -62,6 +62,22 @@ def main() -> pd.DataFrame:
     experimentos.registrar(resultado_bin)
     print(f"  f1 {resultado_bin['metrica_test']}  brecha {resultado_bin['brecha']}")
 
+    # --- ¿el texto tiene señal, o simplemente ya está capturada? ---
+    # Si el texto no mueve la métrica sobre el dataset con perfiles, puede ser que no
+    # aporte nada o que lo que aporta ya lo diga `libro_afinidad`. La forma de saberlo
+    # es medirlo sobre el dataset limpio, SIN las variables de perfil.
+    print("\n· el mismo texto, pero sobre el dataset limpio (sin perfiles)")
+    limpio = pd.read_pickle(config.CHECKPOINT_LIMPIO)
+    limpio = variables.dividir(limpio)
+    matriz_l, vect_l = texto.vectorizar(limpio, **REJILLA_TFIDF[0])
+    es_train_l = (~limpio[variables.COL_SPLIT]).to_numpy()
+    imps_l = texto.importancias_del_texto(matriz_l, limpio[config.TARGET].to_numpy(), es_train_l)
+    denso_l, _, _ = texto.seleccionar_columnas(matriz_l, vect_l, imps_l, PALABRAS_FINALES)
+    con_texto_l = pd.concat([limpio.reset_index(drop=True), denso_l], axis=1)
+    r = modelo.evaluar(con_texto_l, "~ TF-IDF sobre el dataset limpio (sin perfiles)")
+    experimentos.registrar(r)
+    print(f"  f1 {r['metrica_test']}  brecha {r['brecha']}")
+
     # --- el ganador ---
     resultado, con_texto, palabras, imps, etiqueta = mejor
     print(f"\nMejor configuración de texto: {etiqueta}")
