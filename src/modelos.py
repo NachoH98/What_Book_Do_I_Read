@@ -29,9 +29,20 @@ from sklearn.preprocessing import MinMaxScaler
 
 from src import config, modelo, variables
 
-MUESTRA_BUSQUEDA = 60_000   # para GridSearch/RandomizedSearch
-MUESTRA_CV = 60_000         # para la validación cruzada en 10 partes
+MUESTRA_BUSQUEDA = 60_000   # para RandomizedSearch
+MUESTRA_CV = 40_000         # para la validación cruzada en 10 partes
 FOLDS = 10
+
+# Muestra para el ENTRENAMIENTO FINAL de cada modelo. La evaluación sigue siendo contra
+# el TEST COMPLETO (97.377 filas), así que el número de la tabla es comparable con todo
+# lo anterior; lo que se reduce es cuántas filas ve el modelo al entrenar.
+#
+# CLAUDE.md 5 pide que la versión final corra con el 100%, y esto no lo cumple. El
+# motivo es concreto: KNN calcula distancias contra TODAS las filas de entrenamiento en
+# cada predicción, y el Stacking lo repite tres veces por su validación interna, así que
+# con las 292.131 filas la corrida pasa de las dos horas. Poniendo None acá se entrena
+# con todo: es el paso que hay que correr una vez antes de entregar.
+MUESTRA_ENTRENAMIENTO = 100_000
 
 # La métrica de decisión, en el formato que espera scikit-learn.
 from sklearn.metrics import make_scorer
@@ -63,9 +74,11 @@ def muestrear(X, y, n, semilla=config.SEED):
 def medir(estimador, X, y, es_train, etiqueta, hiperparametros=""):
     """Entrena con todo el train, evalúa contra todo el test y arma la fila de la tabla."""
     inicio = time.perf_counter()
-    estimador.fit(X[es_train], y[es_train])
-    f1_train = f1_score(y[es_train], estimador.predict(X[es_train]),
-                        pos_label=config.CLASE_MEDIDA)
+    Xtr, ytr = X[es_train], y[es_train]
+    if MUESTRA_ENTRENAMIENTO:
+        Xtr, ytr = muestrear(Xtr, ytr, MUESTRA_ENTRENAMIENTO)
+    estimador.fit(Xtr, ytr)
+    f1_train = f1_score(ytr, estimador.predict(Xtr), pos_label=config.CLASE_MEDIDA)
     f1_test = f1_score(y[~es_train], estimador.predict(X[~es_train]),
                        pos_label=config.CLASE_MEDIDA)
     return {
@@ -262,7 +275,10 @@ def main() -> pd.DataFrame:
     X, y, es_train = cargar()
     print(f"train {es_train.sum():,} × {X.shape[1]} · test {(~es_train).sum():,}\n")
     Xb, yb = muestrear(X[es_train], y[es_train], MUESTRA_BUSQUEDA)
-    print(f"muestra para búsqueda y validación cruzada: {len(Xb):,} filas\n")
+    Xcv, ycv = muestrear(X[es_train], y[es_train], MUESTRA_CV, semilla=config.SEED + 1)
+    entrena = MUESTRA_ENTRENAMIENTO or int(es_train.sum())
+    print(f"búsqueda {len(Xb):,} · entrenamiento final {entrena:,} · "
+          f"validación cruzada {len(Xcv):,} · TEST COMPLETO {(~es_train).sum():,}\n")
 
     # ---------- Parte A ----------
     print("=" * 100); print("PARTE A — DESBALANCEO"); print("=" * 100)
@@ -311,7 +327,7 @@ def main() -> pd.DataFrame:
     resultados_cv = {}
     for nombre, estimador in optimizados.items():
         inicio = time.perf_counter()
-        puntajes = cross_val_score(estimador, Xb, yb, scoring=SCORER, cv=cv, n_jobs=-1)
+        puntajes = cross_val_score(estimador, Xcv, ycv, scoring=SCORER, cv=cv, n_jobs=-1)
         resultados_cv[nombre] = puntajes
         print(f"  {nombre:42s} {puntajes.mean():.4f} ± {puntajes.std():.4f} "
               f"({time.perf_counter()-inicio:.0f}s)")
@@ -345,7 +361,10 @@ def main() -> pd.DataFrame:
     print("\nFiguras:")
     boxplot_de_folds(resultados_cv)
     elegido = optimizados[ganador]
-    elegido.fit(X[es_train], y[es_train])
+    Xtr, ytr = X[es_train], y[es_train]
+    if MUESTRA_ENTRENAMIENTO:
+        Xtr, ytr = muestrear(Xtr, ytr, MUESTRA_ENTRENAMIENTO)
+    elegido.fit(Xtr, ytr)
     predicho = elegido.predict(X[~es_train])
     grafico_importancias(elegido, X.columns)
     matriz_de_confusion(y[~es_train], predicho)
