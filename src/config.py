@@ -64,6 +64,7 @@ CSV_OPINIONES = resolver_csv(ARCHIVO_OPINIONES)
 CHECKPOINT_BASE = DIR_CHECKPOINTS / "01_base.pkl"
 CHECKPOINT_LIMPIO = DIR_CHECKPOINTS / "04_limpio.pkl"
 CHECKPOINT_VARIABLES = DIR_CHECKPOINTS / "05_variables.pkl"
+CHECKPOINT_TEXTO = DIR_CHECKPOINTS / "06_texto.pkl"
 
 # --------------------------------------------------------------------------------------
 # Reproducibilidad y evaluación

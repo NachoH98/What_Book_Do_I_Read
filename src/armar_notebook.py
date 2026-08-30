@@ -40,6 +40,12 @@ SECCIONES = [
     ("src/experimentos.py", "8. Registro de experimentos"),
     ("src/correr_base.py", "9. Experimento #0 — la base sin limpiar"),
     ("src/correr_limpieza.py", "10. Los experimentos de limpieza"),
+    ("src/variables.py", "11. Creación de variables"),
+    ("src/test_fuga.py", "12. Verificación de que no hay fuga"),
+    ("src/correr_variables.py", "13. Los experimentos de variables"),
+    ("src/texto.py", "14. Minería de texto"),
+    ("src/limpiar_resumenes.py", "15. Lematización de los resúmenes"),
+    ("src/correr_texto.py", "16. Los experimentos de texto"),
 ]
 
 # Cuatro módulos definen `main()`. En el paquete conviven sin problema porque cada uno
@@ -96,6 +102,7 @@ ALIAS_CODE = '''import sys
 
 _yo = sys.modules["__main__"]
 config = carga = diagnostico = eda = limpieza = modelo = experimentos = _yo
+variables = texto = test_fuga = _yo
 '''
 
 _EJECUCION_VIEJA = """## 11. Ejecución
@@ -126,6 +133,27 @@ EJECUCIONES = {
         "**Corremos los experimentos de limpieza.** Cada paso es una fila con su delta "
         "marginal; el pipeline final queda en `checkpoints/04_limpio.pkl`.",
         "%%time\ntabla = main_correr_limpieza()\n",
+    ),
+    "src/test_fuga.py": (
+        "**Verificamos que ninguna variable haya visto el test.** Damos vuelta el "
+        "target de las filas de test y comprobamos que nada se mueve.",
+        "%%time\nmain_test_fuga()\n",
+    ),
+    "src/correr_variables.py": (
+        "**Medimos cada bloque de variables por separado.** Es la etapa que más baja "
+        "el error; el dataset queda en `checkpoints/05_variables.pkl`.",
+        "%%time\ntabla = main_correr_variables()\n",
+    ),
+    "src/limpiar_resumenes.py": (
+        "**Lematizamos los resúmenes una sola vez y los cacheamos.** Son ~10 minutos "
+        "sobre los 44.112 resúmenes distintos; rehacerlo por experimento sería tirar "
+        "el tiempo.",
+        "%%time\nmain_limpiar_resumenes()\n",
+    ),
+    "src/correr_texto.py": (
+        "**Comparamos TF-IDF contra palabras clave binarias.** Deja la nube de "
+        "palabras, el gráfico de importancias y `checkpoints/06_texto.pkl`.",
+        "%%time\ntabla = main_correr_texto()\n",
     ),
 }
 
