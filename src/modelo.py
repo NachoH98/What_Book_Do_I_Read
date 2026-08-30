@@ -113,3 +113,42 @@ def evaluar(df: pd.DataFrame, nombre_experimento: str) -> dict:
         "columnas": X.shape[1],
         "segundos": round(time.perf_counter() - inicio, 1),
     }
+
+
+# --------------------------------------------------------------------------------------
+# El modelo final
+# --------------------------------------------------------------------------------------
+
+ARCHIVO_MODELO_FINAL = config.DIR_CHECKPOINTS / "07_modelo_final.pkl"
+
+
+def modelo_final(entrenar_si_falta: bool = False):
+    """Devuelve el pipeline ganador, ya entrenado, tal como quedó de la comparación.
+
+    Lo produce `python -m src.modelos`, que optimiza cada modelo base por separado,
+    los compara contra el test completo y elige con el criterio del curso: primero se
+    descarta por brecha, después se elige por métrica.
+
+    Devuelve una tupla (nombre, estimador, columnas). Las columnas importan: el
+    estimador espera exactamente ese orden de features, así que cualquier DataFrame
+    nuevo hay que reindexarlo antes de predecir.
+    """
+    import pickle
+
+    if not ARCHIVO_MODELO_FINAL.is_file():
+        if not entrenar_si_falta:
+            raise FileNotFoundError(
+                f"Falta {ARCHIVO_MODELO_FINAL}. Correr antes: python -m src.modelos")
+        from src import modelos
+        modelos.main()
+
+    with open(ARCHIVO_MODELO_FINAL, "rb") as archivo:
+        guardado = pickle.load(archivo)
+    return guardado["nombre"], guardado["estimador"], guardado["columnas"]
+
+
+def predecir(df: pd.DataFrame):
+    """Predice con el modelo final sobre un DataFrame cualquiera del proyecto."""
+    _, estimador, columnas = modelo_final()
+    X, _ = separar_x_y(df) if config.TARGET in df.columns else (df, None)
+    return estimador.predict(X.reindex(columns=columnas, fill_value=config.RELLENO_NULOS))
