@@ -9,11 +9,14 @@ import pandas as pd
 
 from src import config, experimentos, modelo, variables
 
+# Los bloques se miden con el mismo criterio que el pipeline elegido (leave-one-out).
+# Medirlos con el cálculo directo daría números que no corresponden a lo que se entrega.
 BLOQUES = [
     ("top-N de autor y editorial", [variables.top_n, variables.dummies_nuevas]),
-    ("perfil del lector", [variables.top_n, variables.perfil_lector,
-                           variables.perfil_lector_autor]),
-    ("perfil del libro", [variables.perfil_libro]),
+    ("perfil del lector", [variables.top_n,
+                           lambda d: variables.perfil_lector(d, loo=True),
+                           lambda d: variables.perfil_lector_autor(d, loo=True)]),
+    ("perfil del libro", [lambda d: variables.perfil_libro(d, loo=True)]),
     ("antigüedad del libro y edad del lector", [variables.antiguedad_y_edad]),
     ("interacción región × editorial", [variables.top_n,
                                         variables.interaccion_region_editorial,
@@ -40,9 +43,13 @@ def main() -> pd.DataFrame:
         print(f"· bloque aislado: {etiqueta}  ({aislado.shape[1]} columnas)")
         experimentos.registrar(modelo.evaluar(aislado, f"~ sólo {etiqueta}"))
 
-    print("\n· todas las variables juntas")
-    completo = variables.aplicar(df)
-    experimentos.registrar(modelo.evaluar(completo, "= TODAS las variables"))
+    print("\n· todas las variables, cálculo directo (la variante descartada)")
+    directo = variables.aplicar(df, variables.PIPELINE_DIRECTO)
+    experimentos.registrar(modelo.evaluar(directo, "~ variables con cálculo directo (descartado)"))
+
+    print("· todas las variables, leave-one-out (la elegida)")
+    completo = variables.aplicar(df, variables.PIPELINE_LOO)
+    experimentos.registrar(modelo.evaluar(completo, "= TODAS las variables (leave-one-out)"))
 
     config.DIR_CHECKPOINTS.mkdir(parents=True, exist_ok=True)
     completo.to_pickle(config.CHECKPOINT_VARIABLES)

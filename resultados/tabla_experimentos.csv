@@ -1,20 +1,20 @@
 #,cambio,metrica_train,metrica_test,brecha,delta,delta_marginal,filas,columnas,segundos,queda
 0,Base sin limpiar,0.2903,0.2883,-0.0019,0.0,,389508,1,10.3,#0
-1,"(referencia) sólo dummies, sin limpiar",0.3059,0.3038,-0.0021,0.0155,0.0155,389508,63,13.6,sí
-2,+filtrar opiniones sin rating,0.3059,0.3038,-0.0021,0.0155,0.0,389508,63,13.4,ruido
-3,+descartar libros inexistentes,0.3076,0.3015,-0.0061,0.0132,-0.0023,388842,63,13.2,ruido
-4,+año de nacimiento imposible → nulo,0.3044,0.2985,-0.0059,0.0102,-0.003,388842,63,13.6,ruido
-5,+año de edición ilegible → nulo,0.3064,0.2942,-0.0122,0.0059,-0.0043,388842,64,14.2,ruido
-6,+normalizar vive_en → región,0.3096,0.2994,-0.0102,0.0111,0.0052,388842,71,14.3,sí
-7,+imputar género del lector,0.3136,0.3036,-0.01,0.0153,0.0042,388842,74,14.6,ruido
-8,+imputar categóricas con Desconocido,0.315,0.3043,-0.0107,0.016,0.0007,388842,63,13.9,ruido
-9,+año de edición posterior a la opinión → nulo,0.3133,0.3031,-0.0102,0.0148,-0.0012,388842,63,14.4,ruido
-10,= PIPELINE FINAL (sólo lo que quedó),0.313,0.3068,-0.0062,0.0185,,389508,64,14.3,final
-11,= referencia: limpio con split explícito,0.3126,0.3069,-0.0056,0.0186,,389508,64,15.5,final
-12,~ sólo top-N de autor y editorial,0.339,0.3312,-0.0078,0.0429,,389508,216,23.0,final
-13,~ sólo perfil del lector,0.6238,0.4324,-0.1914,0.1441,,389508,69,17.4,final
-14,~ sólo perfil del libro,0.5263,0.3896,-0.1367,0.1013,,389508,69,17.4,final
-15,~ sólo antigüedad del libro y edad del lector,0.3138,0.3056,-0.0082,0.0173,,389508,66,14.6,final
-16,~ sólo interacción región × editorial,0.3347,0.3257,-0.009,0.0374,,389508,341,29.0,final
-17,= TODAS las variables,0.7211,0.4865,-0.2346,0.1982,,389508,353,33.4,final
-18,= TODAS las variables (leave-one-out),0.5775,0.4828,-0.0947,0.1945,,389508,353,33.4,final
+1,"(referencia) sólo dummies, sin limpiar",0.3059,0.3038,-0.0021,0.0155,0.0155,389508,63,14.1,sí
+2,+filtrar opiniones sin rating,0.3059,0.3038,-0.0021,0.0155,0.0,389508,63,13.7,ruido
+3,+descartar libros inexistentes,0.3076,0.3015,-0.0061,0.0132,-0.0023,388842,63,14.1,ruido
+4,+año de nacimiento imposible → nulo,0.3044,0.2985,-0.0059,0.0102,-0.003,388842,63,13.9,ruido
+5,+año de edición ilegible → nulo,0.3064,0.2942,-0.0122,0.0059,-0.0043,388842,64,15.7,ruido
+6,+normalizar vive_en → región,0.3096,0.2994,-0.0102,0.0111,0.0052,388842,71,15.4,sí
+7,+imputar género del lector,0.3136,0.3036,-0.01,0.0153,0.0042,388842,74,15.9,ruido
+8,+imputar categóricas con Desconocido,0.315,0.3043,-0.0107,0.016,0.0007,388842,63,15.3,ruido
+9,+año de edición posterior a la opinión → nulo,0.3133,0.3031,-0.0102,0.0148,-0.0012,388842,63,15.6,ruido
+10,= PIPELINE FINAL (sólo lo que quedó),0.313,0.3068,-0.0062,0.0185,,389508,64,16.1,final
+11,= referencia: limpio con split explícito,0.3126,0.3069,-0.0056,0.0186,,389508,64,15.7,final
+12,~ sólo top-N de autor y editorial,0.339,0.3312,-0.0078,0.0429,,389508,216,22.4,final
+13,~ sólo perfil del lector,0.4529,0.4431,-0.0098,0.1548,,389508,69,17.8,final
+14,~ sólo perfil del libro,0.3988,0.3903,-0.0085,0.102,,389508,69,17.9,final
+15,~ sólo antigüedad del libro y edad del lector,0.3138,0.3056,-0.0082,0.0173,,389508,66,15.7,final
+16,~ sólo interacción región × editorial,0.3347,0.3257,-0.009,0.0374,,389508,341,28.7,final
+17,~ variables con cálculo directo (descartado),0.7211,0.4865,-0.2346,0.1982,,389508,353,31.8,final
+18,= TODAS las variables (leave-one-out),0.5004,0.489,-0.0114,0.2007,,389508,353,32.5,final

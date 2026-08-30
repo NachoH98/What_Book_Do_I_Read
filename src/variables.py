@@ -166,16 +166,32 @@ def perfil_libro(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
     train = _train(out)
     prior = train[config.TARGET].mean()
     segmentos = {
-        "libro_afinidad_hombres": train["genero_lector_imputado"].eq("Hombre"),
-        "libro_afinidad_mujeres": train["genero_lector_imputado"].eq("Mujer"),
-        "libro_afinidad_espania": train["region"].str.startswith("España"),
+        "libro_afinidad_hombres": out["genero_lector_imputado"].eq("Hombre"),
+        "libro_afinidad_mujeres": out["genero_lector_imputado"].eq("Mujer"),
+        "libro_afinidad_espania": out["region"].str.startswith("España"),
     }
-    for nombre, mascara in segmentos.items():
-        tabla = (train.loc[mascara].groupby("id_libro", observed=True)[config.TARGET]
-                 .mean().rename(nombre))
-        out[nombre] = (out[["id_libro"]].merge(tabla, how="left", left_on="id_libro",
-                                               right_index=True)[nombre]
-                       .fillna(prior).astype("float32").values)
+    es_train = (~out[COL_SPLIT]).to_numpy()
+    objetivo = out[config.TARGET].to_numpy()
+
+    for nombre, pertenece in segmentos.items():
+        # El agregado se calcula sobre las filas de train QUE PERTENECEN al segmento.
+        del_segmento = train.loc[pertenece.loc[train.index]]
+        agregado = del_segmento.groupby("id_libro", observed=True)[config.TARGET].agg(["sum", "count"])
+        unido = out[["id_libro"]].merge(agregado, how="left", left_on="id_libro", right_index=True)
+        suma = unido["sum"].to_numpy(dtype="float64")
+        n = unido["count"].to_numpy(dtype="float64")
+
+        if loo:
+            # Sólo se descuenta la fila que efectivamente aportó al agregado: tiene
+            # que ser de train Y pertenecer al segmento. Sin la segunda condición se
+            # restarían filas que nunca sumaron, y el promedio quedaría mal.
+            aporto = es_train & pertenece.to_numpy()
+            suma = np.where(aporto, suma - objetivo, suma)
+            n = np.where(aporto, n - 1, n)
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            valores = np.where(n > 0, suma / n, np.nan)
+        out[nombre] = pd.Series(valores).fillna(prior).astype("float32").values
     return out
 
 
@@ -260,7 +276,20 @@ def _con_loo(funcion):
     return envuelta
 
 
-# Variante con leave-one-out, para medirla contra la directa (ceteris paribus).
+# El pipeline ELEGIDO. Cada fila de train se excluye de su propio perfil.
+#
+# La medición que lo decidió: con cálculo directo el f1 de test da 0.4865 con brecha
+# -0.2346; con leave-one-out da 0.4828 con brecha -0.0947. En métrica están empatados
+# (0.0037 cae dentro de la banda de ruido de ±0.005), pero la brecha se corta un 60%,
+# y el criterio del curso es descartar primero por brecha.
+#
+# El mecanismo, medido: con cálculo directo la correlación de `afinidad_lector_genero`
+# con el target vale 0.590 en train y 0.338 en test — la variable significa algo
+# distinto de cada lado, porque en train contiene la respuesta de su propia fila. Con
+# leave-one-out da 0.345 y 0.338: la misma variable en ambos lados.
+#
+# Es el mismo principio de "dejar la fila afuera" de la validación cruzada, aplicado
+# al cálculo de la variable en vez de a la evaluación del modelo.
 PIPELINE_LOO = [
     top_n,
     _con_loo(perfil_lector),
@@ -271,7 +300,9 @@ PIPELINE_LOO = [
     dummies_nuevas,
 ]
 
-PIPELINE = [
+# PROBADA Y DESCARTADA: la variante directa, sin leave-one-out. Se conserva porque
+# produce la comparación que va al informe, no porque se use.
+PIPELINE_DIRECTO = [
     top_n,                        # autor_top y editorial_top: los necesitan los de abajo
     perfil_lector,
     perfil_lector_autor,
@@ -280,6 +311,8 @@ PIPELINE = [
     interaccion_region_editorial,
     dummies_nuevas,
 ]
+
+PIPELINE = PIPELINE_LOO
 
 
 def aplicar(df: pd.DataFrame, funciones=None) -> pd.DataFrame:
