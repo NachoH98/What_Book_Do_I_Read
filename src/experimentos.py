@@ -18,7 +18,7 @@ BASE = "#0"  # etiqueta de la fila base en la columna `queda`
 # Las filas de resumen empiezan con "=". No son un paso más: comparar su delta
 # marginal contra la fila de arriba no significa nada, porque la de arriba puede ser
 # una variante descartada y no el paso anterior del pipeline.
-PREFIJO_RESUMEN = "="
+PREFIJO_RESUMEN = ("=", "~")
 
 
 def _veredicto(delta_marginal) -> str:
@@ -87,7 +87,7 @@ def registrar(resultado: dict) -> pd.DataFrame:
         nueva["delta_marginal"] = nueva["metrica_test"].diff().round(4)
         nueva["queda"] = nueva["delta_marginal"].apply(_veredicto)
         nueva.loc[nueva["#"] == 0, ["delta_marginal", "queda"]] = [None, BASE]
-        resumen = nueva["cambio"].str.startswith(PREFIJO_RESUMEN)
+        resumen = nueva["cambio"].str.startswith(tuple(PREFIJO_RESUMEN))
         nueva.loc[resumen, ["delta_marginal", "queda"]] = [None, "final"]
 
     config.DIR_RESULTADOS.mkdir(parents=True, exist_ok=True)

@@ -10,3 +10,11 @@
 8,+imputar categóricas con Desconocido,0.315,0.3043,-0.0107,0.016,0.0007,388842,63,13.9,ruido
 9,+año de edición posterior a la opinión → nulo,0.3133,0.3031,-0.0102,0.0148,-0.0012,388842,63,14.4,ruido
 10,= PIPELINE FINAL (sólo lo que quedó),0.313,0.3068,-0.0062,0.0185,,389508,64,14.3,final
+11,= referencia: limpio con split explícito,0.3126,0.3069,-0.0056,0.0186,,389508,64,15.5,final
+12,~ sólo top-N de autor y editorial,0.339,0.3312,-0.0078,0.0429,,389508,216,23.0,final
+13,~ sólo perfil del lector,0.6238,0.4324,-0.1914,0.1441,,389508,69,17.4,final
+14,~ sólo perfil del libro,0.5263,0.3896,-0.1367,0.1013,,389508,69,17.4,final
+15,~ sólo antigüedad del libro y edad del lector,0.3138,0.3056,-0.0082,0.0173,,389508,66,14.6,final
+16,~ sólo interacción región × editorial,0.3347,0.3257,-0.009,0.0374,,389508,341,29.0,final
+17,= TODAS las variables,0.7211,0.4865,-0.2346,0.1982,,389508,353,33.4,final
+18,= TODAS las variables (leave-one-out),0.5775,0.4828,-0.0947,0.1945,,389508,353,33.4,final

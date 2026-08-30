@@ -17,6 +17,10 @@ from sklearn.model_selection import train_test_split
 
 from src import config
 
+# La columna que marca qué filas son test. Se define acá y no se importa de
+# `variables` para no crear una dependencia circular entre los dos módulos.
+COL_SPLIT = "es_test"
+
 # Una sola métrica de decisión (CLAUDE.md 3.2). `accuracy` no está y no va a estar:
 # con clases ~84/16, predecir siempre 1 da 84% y no significa nada. Por el mismo
 # motivo la métrica se calcula sobre la clase `config.CLASE_MEDIDA`.
@@ -35,6 +39,8 @@ def es_derivada_del_target(columna: str) -> bool:
     tambien queda afuera: entrenar con ellas es fuga de información (CLAUDE.md 3.3).
     """
     nombre = columna.lower()
+    if columna == COL_SPLIT:
+        return True  # la marca de train/test no es un dato del problema
     return config.COL_RATING in nombre or config.TARGET in nombre
 
 
@@ -73,12 +79,22 @@ def evaluar(df: pd.DataFrame, nombre_experimento: str) -> dict:
     inicio = time.perf_counter()
 
     X, y = separar_x_y(df)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=config.TEST_SIZE,
-        random_state=config.SEED,
-        stratify=y,  # las clases están ~84/16: sin estratificar el split las corre
-    )
+
+    if COL_SPLIT in df.columns:
+        # Split explícito. Desde la rama de variables el dataset trae su propia
+        # partición, y la evaluación TIENE que usar esa misma: los perfiles se
+        # calcularon con ese train, así que evaluarlos contra otro test metería en el
+        # test filas que participaron del cálculo. Sería una fuga silenciosa.
+        es_test = df[COL_SPLIT].to_numpy()
+        X_train, X_test = X[~es_test], X[es_test]
+        y_train, y_test = y[~es_test], y[es_test]
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=config.TEST_SIZE,
+            random_state=config.SEED,
+            stratify=y,  # las clases están ~84/16: sin estratificar el split las corre
+        )
 
     modelo = modelo_congelado().fit(X_train, y_train)
     metrica = METRICAS[config.METRICA]
