@@ -226,18 +226,58 @@ def boxplot_de_folds(resultados_cv: dict, nombre="13_boxplot_folds"):
     print(f"  → {nombre}.png")
 
 
+def _importancias_nativas(estimador):
+    """Importancias exactas del modelo, sin aproximaciones.
+
+    Los modelos de árboles traen `feature_importances_`. Un modelo lineal no, pero su
+    equivalente exacto es el módulo de sus coeficientes: como las variables entran
+    escaladas entre 0 y 1, los coeficientes son directamente comparables entre sí. En
+    un bagging se promedia el coeficiente de cada estimador de la bolsa.
+
+    Nada de SHAP: está prohibida por CLAUDE.md 3.1 y además es una aproximación cuando
+    el cálculo exacto ya viene con el modelo.
+    """
+    # Un Pipeline delega en su último paso.
+    if hasattr(estimador, "steps"):
+        estimador = estimador.steps[-1][1]
+
+    if hasattr(estimador, "feature_importances_"):
+        return estimador.feature_importances_
+
+    if hasattr(estimador, "coef_"):
+        return np.abs(np.ravel(estimador.coef_))
+
+    # Bagging: el promedio de los coeficientes de la bolsa. Cada estimador ve un
+    # subconjunto de columnas, así que se acumula en las posiciones que le tocaron.
+    if hasattr(estimador, "estimators_") and hasattr(estimador, "estimators_features_"):
+        n_columnas = max(max(f) for f in estimador.estimators_features_) + 1
+        acumulado = np.zeros(n_columnas)
+        cuenta = np.zeros(n_columnas)
+        for sub, columnas_vistas in zip(estimador.estimators_,
+                                        estimador.estimators_features_):
+            if not hasattr(sub, "coef_"):
+                return None
+            acumulado[columnas_vistas] += np.abs(np.ravel(sub.coef_))
+            cuenta[columnas_vistas] += 1
+        return np.divide(acumulado, np.maximum(cuenta, 1))
+
+    return None
+
+
 def grafico_importancias(estimador, columnas, nombre="14_importancias", cuantas=25):
     """Importancias nativas del mejor modelo. No SHAP: está prohibida y además es una
     aproximación cuando el cálculo exacto ya viene con el modelo."""
-    if not hasattr(estimador, "feature_importances_"):
-        print("  (el modelo elegido no expone feature_importances_)")
+    valores = _importancias_nativas(estimador)
+    if valores is None:
+        print("  (no se pudieron obtener importancias nativas de este modelo)")
         return None
     plt = _estilo()
-    importancias = pd.Series(estimador.feature_importances_, index=columnas)
+    importancias = pd.Series(valores, index=columnas)
     top = importancias.sort_values(ascending=False).head(cuantas).sort_values()
     fig, ax = plt.subplots(figsize=(8, max(4, cuantas * 0.26)))
     ax.barh(top.index, top.values, color="#2a78d6", height=0.72)
-    ax.set_xlabel("importancia")
+    ax.set_xlabel("importancia" if hasattr(estimador, "feature_importances_")
+                  else "|coeficiente| promedio de la bolsa")
     ax.set_title(f"Las {cuantas} variables más importantes del modelo elegido")
     ax.grid(axis="y", visible=False)
     for lado in ("top", "right"):
