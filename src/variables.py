@@ -71,36 +71,75 @@ def _train(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[~df[COL_SPLIT]]
 
 
+K_FOLDS_ENCODING = 5
+
+
+def _promedio_desde(fuente: pd.DataFrame, destino: pd.DataFrame, claves, prior):
+    """Promedio de `gusto` por clave, calculado en `fuente` y aplicado a `destino`."""
+    agregado = fuente.groupby(claves, observed=True)[config.TARGET].mean()
+    unido = destino[claves].merge(agregado.rename("v"), how="left",
+                                  left_on=claves, right_index=True)
+    # copy() explícito: to_numpy puede devolver una vista de sólo lectura, y el
+    # modo out-of-fold escribe sobre este arreglo pliegue por pliegue.
+    return unido["v"].fillna(prior).to_numpy(dtype="float64", copy=True)
+
+
 def _afinidad_por(df: pd.DataFrame, claves: list[str], nombre: str,
-                  loo: bool = False) -> pd.Series:
+                  modo: str = "oof") -> pd.Series:
     """Proporción de `gusto` por combinación de claves, calculada SÓLO sobre train.
 
-    Las combinaciones que no existen en train reciben la tasa global de train. Es la
-    mejor estimación disponible cuando no hay información específica, y evita meter
-    nulos en una columna que el modelo va a usar.
+    Tres modos, y la diferencia entre ellos decidió la rama:
 
-    Con `loo=True` cada fila de train se excluye a sí misma del promedio. Sin eso, la
-    fila aporta su propio target al perfil que después se usa para predecirla: no es
-    fuga de test —el test nunca participa del cálculo— pero el modelo entrena viendo
-    parte de la respuesta y la brecha se dispara. Con el 46% de los libros teniendo una
-    sola opinión, para esos el perfil ES el target copiado con otro nombre.
+    - "directo": el promedio incluye la propia fila. El modelo entrena viendo parte de
+      su respuesta. Con el 46% de los libros con una sola opinión, para esos el perfil
+      ES el target copiado.
+
+    - "loo": cada fila de train se excluye a sí misma. Parece resolverlo, pero es
+      ALGEBRAICAMENTE INVERTIBLE: teniendo la media LOO y el tamaño del grupo,
+      y_i = suma_del_grupo - loo*(n-1) recupera el target exacto. Medido: recupera el
+      100,0% de las filas de train, y un GradientBoosting con sólo esas dos columnas
+      saca 0.9229 en train contra 0.2386 en test.
+
+    - "oof" (el elegido): train se parte en K pliegues y el perfil de cada pliegue se
+      calcula con los OTROS. La fila no participó del promedio y tampoco puede
+      despejarlo, porque no sabe qué filas entraron. Es el mismo principio de la
+      validación cruzada, aplicado al cálculo de la variable.
+
+    Las filas de test siempre reciben el promedio de TODO train: nunca participaron,
+    así que no hay nada que sacarles. Las combinaciones que no existen en train reciben
+    la tasa global, que es la mejor estimación disponible sin información específica.
     """
     train = _train(df)
     prior = train[config.TARGET].mean()
-    agregado = train.groupby(claves, observed=True)[config.TARGET].agg(["sum", "count"])
-    unido = df[claves].merge(agregado, how="left", left_on=claves, right_index=True)
-    suma = unido["sum"].to_numpy(dtype="float64")
-    n = unido["count"].to_numpy(dtype="float64")
+    es_train = (~df[COL_SPLIT]).to_numpy()
+    valores = _promedio_desde(train, df, claves, prior)
 
-    if loo:
-        # Sólo las filas de train se descuentan a sí mismas; las de test no
-        # participaron del agregado, así que no hay nada que restarles.
-        es_train = (~df[COL_SPLIT]).to_numpy()
+    if modo == "directo":
+        pass
+
+    elif modo == "loo":
+        agregado = train.groupby(claves, observed=True)[config.TARGET].agg(["sum", "count"])
+        unido = df[claves].merge(agregado, how="left", left_on=claves, right_index=True)
+        suma = unido["sum"].to_numpy(dtype="float64")
+        n = unido["count"].to_numpy(dtype="float64")
         suma = np.where(es_train, suma - df[config.TARGET].to_numpy(), suma)
         n = np.where(es_train, n - 1, n)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            calculado = np.where(n > 0, suma / n, np.nan)
+        valores = np.where(es_train, calculado, valores)
 
-    with np.errstate(invalid="ignore", divide="ignore"):
-        valores = np.where(n > 0, suma / n, np.nan)
+    elif modo == "oof":
+        from sklearn.model_selection import StratifiedKFold
+        pliegues = StratifiedKFold(K_FOLDS_ENCODING, shuffle=True,
+                                   random_state=config.SEED)
+        posiciones_train = np.where(es_train)[0]
+        for dentro, fuera in pliegues.split(train, train[config.TARGET]):
+            # `fuera` son las filas que reciben el valor; `dentro`, las que lo calculan.
+            valores[posiciones_train[fuera]] = _promedio_desde(
+                train.iloc[dentro], train.iloc[fuera], claves, prior)
+    else:
+        raise ValueError(f"modo desconocido: {modo!r}")
+
     return pd.Series(valores).fillna(prior).astype("float32").values
 
 
@@ -116,7 +155,7 @@ def _conteo_por(df: pd.DataFrame, claves: list[str], nombre: str) -> pd.Series:
 # Bloque 1 — perfil del lector
 # --------------------------------------------------------------------------------------
 
-def perfil_lector(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
+def perfil_lector(df: pd.DataFrame, modo: str = "oof") -> pd.DataFrame:
     """Qué le gusta a cada lector, en porcentaje y no en valor absoluto.
 
     El porcentaje es lo que hace comparables a un lector con 2.398 opiniones y a uno
@@ -131,20 +170,20 @@ def perfil_lector(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
     decada = (pd.to_numeric(out["anio_edicion"], errors="coerce") // 10 * 10).fillna(-1)
 
     out["afinidad_lector_genero"] = _afinidad_por(
-        out.assign(_g=out["genero_libro"]), ["id_lector", "_g"], "v", loo)
+        out.assign(_g=out["genero_libro"]), ["id_lector", "_g"], "v", modo)
     out["afinidad_lector_decada"] = _afinidad_por(
-        out.assign(_d=decada), ["id_lector", "_d"], "v", loo)
-    out["afinidad_lector_global"] = _afinidad_por(out, ["id_lector"], "v", loo)
+        out.assign(_d=decada), ["id_lector", "_d"], "v", modo)
+    out["afinidad_lector_global"] = _afinidad_por(out, ["id_lector"], "v", modo)
     out["actividad_lector"] = _conteo_por(out, ["id_lector"], "v")
     return out
 
 
-def perfil_lector_autor(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
+def perfil_lector_autor(df: pd.DataFrame, modo: str = "oof") -> pd.DataFrame:
     """Afinidad del lector con cada autor del top-N. Necesita `autor_top` ya creada."""
     if "autor_top" not in df.columns:
         raise ValueError("perfil_lector_autor necesita que top_n() haya corrido antes.")
     out = df.copy()
-    out["afinidad_lector_autor"] = _afinidad_por(out, ["id_lector", "autor_top"], "v", loo)
+    out["afinidad_lector_autor"] = _afinidad_por(out, ["id_lector", "autor_top"], "v", modo)
     return out
 
 
@@ -152,7 +191,7 @@ def perfil_lector_autor(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
 # Bloque 2 — perfil del libro
 # --------------------------------------------------------------------------------------
 
-def perfil_libro(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
+def perfil_libro(df: pd.DataFrame, modo: str = "oof") -> pd.DataFrame:
     """Cómo le fue al libro con el público, y con qué segmentos del público.
 
     Los cortes por género del lector y por región no son decorativos: si un libro
@@ -161,7 +200,7 @@ def perfil_libro(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
     """
     out = df.copy()
     out["libro_n_opiniones"] = _conteo_por(out, ["id_libro"], "v")
-    out["libro_afinidad"] = _afinidad_por(out, ["id_libro"], "v", loo)
+    out["libro_afinidad"] = _afinidad_por(out, ["id_libro"], "v", modo)
 
     train = _train(out)
     prior = train[config.TARGET].mean()
@@ -171,26 +210,42 @@ def perfil_libro(df: pd.DataFrame, loo: bool = False) -> pd.DataFrame:
         "libro_afinidad_espania": out["region"].str.startswith("España"),
     }
     es_train = (~out[COL_SPLIT]).to_numpy()
-    objetivo = out[config.TARGET].to_numpy()
+    posiciones_train = np.where(es_train)[0]
 
     for nombre, pertenece in segmentos.items():
-        # El agregado se calcula sobre las filas de train QUE PERTENECEN al segmento.
+        # El agregado sale de las filas de train QUE PERTENECEN al segmento: si el
+        # corte es "hombres", una lectora no aporta nada a ese promedio.
         del_segmento = train.loc[pertenece.loc[train.index]]
-        agregado = del_segmento.groupby("id_libro", observed=True)[config.TARGET].agg(["sum", "count"])
-        unido = out[["id_libro"]].merge(agregado, how="left", left_on="id_libro", right_index=True)
-        suma = unido["sum"].to_numpy(dtype="float64")
-        n = unido["count"].to_numpy(dtype="float64")
+        valores = _promedio_desde(del_segmento, out, ["id_libro"], prior)
 
-        if loo:
-            # Sólo se descuenta la fila que efectivamente aportó al agregado: tiene
-            # que ser de train Y pertenecer al segmento. Sin la segunda condición se
-            # restarían filas que nunca sumaron, y el promedio quedaría mal.
+        if modo == "oof":
+            from sklearn.model_selection import StratifiedKFold
+            pliegues = StratifiedKFold(K_FOLDS_ENCODING, shuffle=True,
+                                       random_state=config.SEED)
+            for dentro, fuera in pliegues.split(train, train[config.TARGET]):
+                # El promedio del pliegue sale de las filas del segmento que están en
+                # los OTROS pliegues, y se aplica a todas las de éste.
+                del_pliegue = train.iloc[dentro]
+                fuente = del_pliegue.loc[pertenece.loc[del_pliegue.index]]
+                valores[posiciones_train[fuera]] = _promedio_desde(
+                    fuente, train.iloc[fuera], ["id_libro"], prior)
+
+        elif modo == "loo":
+            objetivo = out[config.TARGET].to_numpy()
+            agregado = del_segmento.groupby("id_libro", observed=True)[config.TARGET].agg(["sum", "count"])
+            unido = out[["id_libro"]].merge(agregado, how="left", left_on="id_libro",
+                                            right_index=True)
+            suma = unido["sum"].to_numpy(dtype="float64")
+            n = unido["count"].to_numpy(dtype="float64")
+            # Sólo se descuenta la fila que efectivamente aportó: de train Y del
+            # segmento. Sin la segunda condición se restarían filas que nunca sumaron.
             aporto = es_train & pertenece.to_numpy()
             suma = np.where(aporto, suma - objetivo, suma)
             n = np.where(aporto, n - 1, n)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                calculado = np.where(n > 0, suma / n, np.nan)
+            valores = np.where(es_train, calculado, valores)
 
-        with np.errstate(invalid="ignore", divide="ignore"):
-            valores = np.where(n > 0, suma / n, np.nan)
         out[nombre] = pd.Series(valores).fillna(prior).astype("float32").values
     return out
 
@@ -269,50 +324,35 @@ def dummies_nuevas(df: pd.DataFrame) -> pd.DataFrame:
 # El pipeline, en el orden en que las dependencias lo permiten
 # --------------------------------------------------------------------------------------
 
-def _con_loo(funcion):
-    """Envuelve un perfil para que se calcule dejando cada fila de train fuera de sí."""
-    envuelta = lambda df: funcion(df, loo=True)
-    envuelta.__name__ = f"{funcion.__name__}_loo"
+def _con_modo(funcion, modo):
+    """Envuelve un perfil para fijarle el modo de codificación."""
+    envuelta = lambda df: funcion(df, modo=modo)
+    envuelta.__name__ = f"{funcion.__name__}_{modo}"
     return envuelta
 
 
-# El pipeline ELEGIDO. Cada fila de train se excluye de su propio perfil.
-#
-# La medición que lo decidió: con cálculo directo el f1 de test da 0.4865 con brecha
-# -0.2346; con leave-one-out da 0.4828 con brecha -0.0947. En métrica están empatados
-# (0.0037 cae dentro de la banda de ruido de ±0.005), pero la brecha se corta un 60%,
-# y el criterio del curso es descartar primero por brecha.
-#
-# El mecanismo, medido: con cálculo directo la correlación de `afinidad_lector_genero`
-# con el target vale 0.590 en train y 0.338 en test — la variable significa algo
-# distinto de cada lado, porque en train contiene la respuesta de su propia fila. Con
-# leave-one-out da 0.345 y 0.338: la misma variable en ambos lados.
-#
-# Es el mismo principio de "dejar la fila afuera" de la validación cruzada, aplicado
-# al cálculo de la variable en vez de a la evaluación del modelo.
-PIPELINE_LOO = [
-    top_n,
-    _con_loo(perfil_lector),
-    _con_loo(perfil_lector_autor),
-    _con_loo(perfil_libro),
-    antiguedad_y_edad,
-    interaccion_region_editorial,
-    dummies_nuevas,
-]
+def _pipeline(modo):
+    return [top_n,
+            _con_modo(perfil_lector, modo),
+            _con_modo(perfil_lector_autor, modo),
+            _con_modo(perfil_libro, modo),
+            antiguedad_y_edad,
+            interaccion_region_editorial,
+            dummies_nuevas]
 
-# PROBADA Y DESCARTADA: la variante directa, sin leave-one-out. Se conserva porque
-# produce la comparación que va al informe, no porque se use.
-PIPELINE_DIRECTO = [
-    top_n,                        # autor_top y editorial_top: los necesitan los de abajo
-    perfil_lector,
-    perfil_lector_autor,
-    perfil_libro,
-    antiguedad_y_edad,
-    interaccion_region_editorial,
-    dummies_nuevas,
-]
 
-PIPELINE = PIPELINE_LOO
+# Tres variantes medidas, una elegida.
+#
+#   directo  el promedio incluye la propia fila
+#   loo      la excluye, pero queda algebraicamente invertible:
+#            y_i = suma_del_grupo - loo*(n-1) recupera el 100,0% de los targets de train
+#   oof      el promedio de cada pliegue sale de los otros: ni participa ni se despeja
+#
+PIPELINE_DIRECTO = _pipeline("directo")
+PIPELINE_LOO = _pipeline("loo")
+PIPELINE_OOF = _pipeline("oof")
+
+PIPELINE = PIPELINE_OOF
 
 
 def aplicar(df: pd.DataFrame, funciones=None) -> pd.DataFrame:

@@ -14,9 +14,9 @@ from src import config, experimentos, modelo, variables
 BLOQUES = [
     ("top-N de autor y editorial", [variables.top_n, variables.dummies_nuevas]),
     ("perfil del lector", [variables.top_n,
-                           lambda d: variables.perfil_lector(d, loo=True),
-                           lambda d: variables.perfil_lector_autor(d, loo=True)]),
-    ("perfil del libro", [lambda d: variables.perfil_libro(d, loo=True)]),
+                           lambda d: variables.perfil_lector(d, modo="oof"),
+                           lambda d: variables.perfil_lector_autor(d, modo="oof")]),
+    ("perfil del libro", [lambda d: variables.perfil_libro(d, modo="oof")]),
     ("antigüedad del libro y edad del lector", [variables.antiguedad_y_edad]),
     ("interacción región × editorial", [variables.top_n,
                                         variables.interaccion_region_editorial,
@@ -43,13 +43,20 @@ def main() -> pd.DataFrame:
         print(f"· bloque aislado: {etiqueta}  ({aislado.shape[1]} columnas)")
         experimentos.registrar(modelo.evaluar(aislado, f"~ sólo {etiqueta}"))
 
-    print("\n· todas las variables, cálculo directo (la variante descartada)")
-    directo = variables.aplicar(df, variables.PIPELINE_DIRECTO)
-    experimentos.registrar(modelo.evaluar(directo, "~ variables con cálculo directo (descartado)"))
+    # Las tres codificaciones del perfil, medidas contra el mismo modelo congelado.
+    print("\n· codificación directa (el promedio incluye la propia fila)")
+    experimentos.registrar(modelo.evaluar(
+        variables.aplicar(df, variables.PIPELINE_DIRECTO),
+        "~ perfiles con codificación directa (descartada)"))
 
-    print("· todas las variables, leave-one-out (la elegida)")
-    completo = variables.aplicar(df, variables.PIPELINE_LOO)
-    experimentos.registrar(modelo.evaluar(completo, "= TODAS las variables (leave-one-out)"))
+    print("· codificación leave-one-out (invertible: descartada)")
+    experimentos.registrar(modelo.evaluar(
+        variables.aplicar(df, variables.PIPELINE_LOO),
+        "~ perfiles con leave-one-out (descartada, invertible)"))
+
+    print("· codificación fuera de fold (la elegida)")
+    completo = variables.aplicar(df, variables.PIPELINE_OOF)
+    experimentos.registrar(modelo.evaluar(completo, "= TODAS las variables (fuera de fold)"))
 
     config.DIR_CHECKPOINTS.mkdir(parents=True, exist_ok=True)
     completo.to_pickle(config.CHECKPOINT_VARIABLES)
